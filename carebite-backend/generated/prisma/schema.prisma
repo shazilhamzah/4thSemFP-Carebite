@@ -1,0 +1,236 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String   @id @db.Uuid
+  name            String   @db.VarChar(255)
+  username        String   @unique @db.VarChar(255)
+  password        String   @db.VarChar(255)
+  dob             DateTime @default(dbgenerated("'1999-12-31 19:00:00+00'::timestamp with time zone")) @db.Timestamptz(6)
+  account_created DateTime @default(dbgenerated("'2025-04-17 10:38:03.159+00'::timestamp with time zone")) @db.Timestamptz(6)
+  user_type       String   @db.VarChar(255)
+  salary          Int      @default(30000)
+  createdAt       DateTime @db.Timestamptz(6)
+  updatedAt       DateTime @db.Timestamptz(6)
+}
+
+model adm {
+  adm_id      Int
+  hospital_id Int
+  users       users @relation(fields: [adm_id, hospital_id], references: [id, hospital_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([adm_id, hospital_id])
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model announcements {
+  id          Int?
+  hospital_id Int?
+  date_added  DateTime? @default(dbgenerated("CURRENT_DATE")) @db.Date
+  title       String    @db.VarChar(50)
+  details     String    @db.VarChar(1000)
+  users       users?    @relation(fields: [id, hospital_id], references: [id, hospital_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@ignore
+}
+
+model attendance {
+  attendance_id Int
+  hospital_id   Int?
+  curr_date     DateTime @default(dbgenerated("CURRENT_DATE")) @db.Date
+  status        String?  @default("absent") @db.VarChar(10)
+  users         users?   @relation(fields: [attendance_id, hospital_id], references: [id, hospital_id], onDelete: Cascade)
+
+  @@id([curr_date, attendance_id])
+}
+
+model donations {
+  donation_id Int      @id @default(autoincrement())
+  donor_id    Int?
+  donors      donors[]
+  gs          gs[]
+  status      status?
+}
+
+model donors {
+  id                   Int                   @id
+  entries1             Int?
+  entries2             Int?
+  donation_id          Int?
+  donations            donations?            @relation(fields: [donation_id], references: [donation_id], onDelete: Cascade)
+  hospital_attendance  hospital_attendance?  @relation(fields: [entries1], references: [hospital_attendance_id], onDelete: Cascade)
+  hospital_food_status hospital_food_status? @relation(fields: [entries2], references: [entries], onDelete: Cascade)
+}
+
+model gm_coord {
+  gm_coord_id          Int                   @id
+  entries1             Int?
+  entries2             Int?
+  utensil_requests_id  Int?
+  grocery_requests_id  Int?
+  hospital_attendance  hospital_attendance?  @relation(fields: [entries1], references: [hospital_attendance_id], onDelete: Cascade)
+  hospital_food_status hospital_food_status? @relation(fields: [entries2], references: [entries], onDelete: Cascade)
+  grocery_request      grocery_request?      @relation(fields: [grocery_requests_id], references: [grocery_request_id], onDelete: Cascade)
+  utensil_request      utensil_request?      @relation(fields: [utensil_requests_id], references: [utensil_request_id], onDelete: Cascade)
+}
+
+model gm_hospital {
+  gm_hospital_id Int
+  hospital_id    Int
+  work_id        Int?
+  users          users        @relation(fields: [gm_hospital_id, hospital_id], references: [id, hospital_id], onDelete: Cascade, onUpdate: NoAction)
+  work_status    work_status? @relation(fields: [work_id], references: [work_id], onDelete: Cascade)
+
+  @@id([gm_hospital_id, hospital_id])
+}
+
+model grocery_items {
+  grocery_id      Int              @id @default(autoincrement())
+  name            String?          @db.VarChar(30)
+  grocery_request grocery_request?
+}
+
+model grocery_request {
+  grocery_request_id Int           @id
+  hospital_id        Int?
+  quantity_requested Int?
+  status_sent        String?       @default("No") @db.VarChar(3)
+  status_recieved    String?       @default("No") @db.VarChar(3)
+  gm_coord           gm_coord[]
+  grocery_items      grocery_items @relation(fields: [grocery_request_id], references: [grocery_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model gs {
+  gs_id                Int                   @id
+  entries1             Int?
+  entries2             Int?
+  donation_id          Int?
+  donations            donations?            @relation(fields: [donation_id], references: [donation_id], onDelete: Cascade)
+  hospital_attendance  hospital_attendance?  @relation(fields: [entries1], references: [hospital_attendance_id], onDelete: Cascade)
+  hospital_food_status hospital_food_status? @relation(fields: [entries2], references: [entries], onDelete: Cascade)
+}
+
+model hospital_attendance {
+  hospital_attendance_id Int        @id @default(autoincrement())
+  id                     Int?
+  hospital_id            Int?
+  donors                 donors[]
+  gm_coord               gm_coord[]
+  gs                     gs[]
+  users                  users?     @relation(fields: [id, hospital_id], references: [id, hospital_id], onDelete: Cascade)
+}
+
+model hospital_food_status {
+  entries     Int          @id @default(autoincrement())
+  menu_id     Int?
+  day         String?      @db.VarChar(30)
+  work_id     Int?
+  donors      donors[]
+  gm_coord    gm_coord[]
+  gs          gs[]
+  menu        menu?        @relation(fields: [day, menu_id], references: [day, menu_id], onDelete: Cascade)
+  work_status work_status? @relation(fields: [work_id], references: [work_id], onDelete: Cascade)
+}
+
+model menu {
+  menu_id              Int
+  day                  String                 @default("Monday") @db.VarChar(30)
+  breakfast            String?                @db.VarChar(30)
+  dinner               String?                @db.VarChar(30)
+  hospital_food_status hospital_food_status[]
+
+  @@id([day, menu_id])
+}
+
+model paycheck {
+  pay_id         Int
+  hospital_id    Int
+  receive_status String? @default("No") @db.VarChar(3)
+  sent_status    String? @default("No") @db.VarChar(3)
+  users          users   @relation(fields: [pay_id, hospital_id], references: [id, hospital_id], onDelete: Cascade)
+
+  @@id([pay_id, hospital_id])
+}
+
+model status {
+  status_id      Int       @id
+  sent_status    String?   @default("No") @db.VarChar(3)
+  recieve_status String?   @default("No") @db.VarChar(3)
+  remarks        String?   @default("Thank you for your donations") @db.VarChar(30)
+  date           DateTime? @default(dbgenerated("CURRENT_DATE")) @db.Date
+  donations      donations @relation(fields: [status_id], references: [donation_id], onDelete: Cascade)
+}
+
+model supervisor {
+  supervisor_id Int
+  hospital_id   Int
+  users         users @relation(fields: [supervisor_id, hospital_id], references: [id, hospital_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([supervisor_id, hospital_id])
+}
+
+model users {
+  id                  Int
+  hospital_id         Int
+  name                String?               @db.VarChar(30)
+  role                String?               @db.VarChar(30)
+  password            String?               @db.VarChar(30)
+  username            String                @unique @db.VarChar(50)
+  cnic                String                @unique @db.VarChar(15)
+  nationality         String                @db.VarChar(15)
+  bloodgroup          String                @db.VarChar(3)
+  joining_date        DateTime?             @default(dbgenerated("CURRENT_DATE")) @db.Date
+  address             String                @db.VarChar(255)
+  contact_no          String                @unique @db.VarChar(20)
+  adm                 adm?
+  announcements       announcements[]       @ignore
+  attendance          attendance[]
+  gm_hospital         gm_hospital?
+  hospital_attendance hospital_attendance[]
+  paycheck            paycheck?
+  supervisor          supervisor?
+  workers             workers?
+
+  @@id([id, hospital_id])
+}
+
+model utensil_request {
+  utensil_request_id Int        @id
+  hospital_id        Int?
+  quantity_requested Int?
+  status_sent        String?    @default("No") @db.VarChar(3)
+  status_recieved    String?    @default("No") @db.VarChar(3)
+  gm_coord           gm_coord[]
+  utensils           utensils   @relation(fields: [utensil_request_id], references: [utensils_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model utensils {
+  utensils_id     Int              @id @default(autoincrement())
+  name            String?          @db.VarChar(30)
+  utensil_request utensil_request?
+}
+
+model work_status {
+  work_id              Int                    @id
+  hospital_id          Int?
+  breakfast_status     String?                @default("Not delivered Yet") @db.VarChar(30)
+  dinner_status        String?                @default("Not delivered Yet") @db.VarChar(30)
+  gm_hospital          gm_hospital[]
+  hospital_food_status hospital_food_status[]
+}
+
+model workers {
+  worker_id   Int
+  hospital_id Int
+  role        String? @db.VarChar(50)
+  users       users   @relation(fields: [worker_id, hospital_id], references: [id, hospital_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([worker_id, hospital_id])
+}
